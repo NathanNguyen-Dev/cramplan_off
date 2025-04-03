@@ -1,0 +1,28 @@
+# Git files
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE settings
+.idea/
+.vscode/
+
+# Local environment files (if not needed in image)
+# .env
+
+# OS specific files
+.DS_Store
+Thumbs.db 

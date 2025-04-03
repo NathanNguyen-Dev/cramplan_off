@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  agent-backend:
+    build:
+      context: ./agent_backend  # Specifies the directory containing the Dockerfile
+      dockerfile: Dockerfile    # Specifies the name of the Dockerfile
+    container_name: cramplan-agent # Optional: Assigns a specific name to the container
+    env_file:
+      - ./agent_backend/.env    # Loads environment variables from the .env file inside agent_backend
+    ports:
+      - "8000:8000"           # Maps host port 8000 to container port 8000
+    volumes:
+      # Optional: Mount local code for development with hot-reloading
+      # Remove or comment out for production builds where code is copied into the image.
+      - ./agent_backend/app:/code/app
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload # Optional: Override CMD for development features like reload
+
+# Note: Ensure the .env file exists in ./agent_backend/ before running docker-compose up. 
