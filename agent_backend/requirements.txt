@@ -3,5 +3,5 @@ uvicorn[standard]
 pydantic
 pydantic-settings
 openai
-agents
+openai-agents
 python-dotenv 
