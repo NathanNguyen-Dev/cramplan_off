@@ -7,8 +7,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Upload, FileText, Calendar } from "lucide-react"
+import { ArrowLeft, Upload, FileText, Calendar, Loader2, AlertCircle } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { useAuth } from "@/context/AuthContext"
 
 // Define types for the quiz data
 interface QuizQuestion {
@@ -35,11 +36,12 @@ interface FormattedQuizQuestion {
 
 export default function UploadPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [courseFiles, setCourseFiles] = useState<File[]>([])
   const [examFiles, setExamFiles] = useState<File[]>([])
   const [daysUntilExam, setDaysUntilExam] = useState<number>(7)
-  const [uploading, setUploading] = useState<boolean>(false)
-  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [isProcessing, setIsProcessing] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleCourseFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -60,90 +62,140 @@ export default function UploadPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setUploading(true)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
 
-    // Create request body
-    const requestBody = {
-      subject: "Biology"
-    };
-    
-    // Store the subject and days until exam in localStorage for later use
-    localStorage.setItem('studySubject', requestBody.subject);
-    localStorage.setItem('daysUntilExam', daysUntilExam.toString());
-    
-    // Log request details for debugging
-    console.log('Making POST request to: http://0.0.0.0:8000/generate-topics');
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+    if (authLoading) {
+      setError("Authentication status is loading, please wait.");
+      return;
+    }
 
-    // Make POST request to generate topics
-    fetch('http://0.0.0.0:8000/generate-topics', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Topics generated successfully:', data);
-      
-      // Log the output from generate-topics
-      console.log('Output from generate-topics:', JSON.stringify(data, null, 2));
-      
-      // Call the second endpoint with the output from the first
-      console.log('Making POST request to: http://0.0.0.0:8000/generate-quiz');
-      console.log('Request body:', JSON.stringify(data, null, 2));
-      
-      return fetch('http://0.0.0.0:8000/generate-quiz', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok for generate-quiz');
-      }
-      return response.json();
-    })
-    .then(quizData => {
-      // Log the output from generate-quiz
-      console.log('Quiz generated successfully:', quizData);
-      console.log('Output from generate-quiz:', JSON.stringify(quizData, null, 2));
-      
-      // Store the quiz data in localStorage for the assessment page to use
-      if (quizData && quizData.list_quiz_questions) {
-        // Transform the quiz data to match the format expected by the assessment page
-        const formattedQuizData = quizData.list_quiz_questions.map((q: QuizQuestion, index: number) => ({
-          id: index + 1,
-          question: q.quiz_question,
-          options: [q.choice_a, q.choice_b, q.choice_c, q.choice_d],
-          correctAnswer: getCorrectAnswerText(q),
-          topic: q.topic
-        }));
-        
-        // Store in localStorage
-        localStorage.setItem('assessmentQuizData', JSON.stringify(formattedQuizData));
-        console.log('Quiz data stored for assessment page:', formattedQuizData);
-      }
-      
-      // Continue with the upload progress simulation
-      simulateUploadProgress();
-    })
-    .catch(error => {
-      console.error('Error in API chain:', error);
-      // Continue with the upload progress simulation even if there's an error
-      simulateUploadProgress();
+    if (!user) {
+      setError("You must be logged in to upload files.");
+      return;
+    }
+
+    if (courseFiles.length === 0 && examFiles.length === 0) {
+       setError("Please select at least one file to upload.");
+       return;
+    }
+
+    setIsProcessing(true);
+
+    // 1. Upload Files
+    const formData = new FormData();
+    formData.append("user_id", user.uid);
+
+    courseFiles.forEach((file) => {
+      formData.append("course_notes", file);
     });
+
+    examFiles.forEach((file) => {
+      formData.append("past_exams", file);
+    });
+
+    let uploadSuccessful = false;
+    try {
+      console.log('Uploading files for user:', user.uid);
+      const uploadResponse = await fetch('http://0.0.0.0:8000/upload-files', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadResult = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+          console.error("Upload failed:", uploadResult);
+          throw new Error(uploadResult.detail || "File upload failed. Please check the server logs.");
+      }
+      
+      console.log('Files uploaded successfully:', uploadResult);
+      uploadSuccessful = true;
+
+    } catch (err: any) {
+      console.error('Error uploading files:', err);
+      setError(`Upload Error: ${err.message}`);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 2. Proceed with Topic/Quiz Generation if Upload was Successful
+    if (uploadSuccessful) {
+      // Create request body for generate-topics (Using a placeholder subject for now)
+      const subject = "User Uploaded Topic"; 
+      const generateTopicsRequestBody = {
+        subject: subject
+      };
+      
+      // Store the subject and days until exam in localStorage for later use
+      localStorage.setItem('studySubject', subject);
+      localStorage.setItem('daysUntilExam', daysUntilExam.toString());
+      
+      console.log('Making POST request to: http://0.0.0.0:8000/generate-topics');
+      console.log('Request body:', JSON.stringify(generateTopicsRequestBody, null, 2));
+
+      try {
+          // Make POST request to generate topics
+          const topicsResponse = await fetch('http://0.0.0.0:8000/generate-topics', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(generateTopicsRequestBody),
+          });
+
+          if (!topicsResponse.ok) {
+            const errorData = await topicsResponse.json().catch(() => ({detail: "Failed to parse topic generation error"}));
+            throw new Error(errorData.detail || 'Topic generation failed');
+          }
+          const topicsData = await topicsResponse.json();
+          console.log('Topics generated successfully:', topicsData);
+
+          // Call the generate-quiz endpoint
+          console.log('Making POST request to: http://0.0.0.0:8000/generate-quiz');
+          console.log('Request body:', JSON.stringify(topicsData, null, 2));
+          
+          const quizResponse = await fetch('http://0.0.0.0:8000/generate-quiz', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(topicsData),
+          });
+
+          if (!quizResponse.ok) {
+             const errorData = await quizResponse.json().catch(() => ({detail: "Failed to parse quiz generation error"}));
+             throw new Error(errorData.detail || 'Quiz generation failed');
+          }
+          const quizData = await quizResponse.json();
+          console.log('Quiz generated successfully:', quizData);
+          
+          // Store the formatted quiz data in localStorage
+          if (quizData && quizData.list_quiz_questions) {
+            const formattedQuizData = quizData.list_quiz_questions.map((q: QuizQuestion, index: number): FormattedQuizQuestion => ({
+              id: index + 1,
+              question: q.quiz_question,
+              options: [q.choice_a, q.choice_b, q.choice_c, q.choice_d],
+              correctAnswer: getCorrectAnswerText(q),
+              topic: q.topic
+            }));
+            localStorage.setItem('assessmentQuizData', JSON.stringify(formattedQuizData));
+            console.log('Quiz data stored for assessment page:', formattedQuizData);
+          } else {
+             console.warn("Quiz data format unexpected or empty. Skipping storage.");
+          }
+          
+          // Navigate to assessment page
+          router.push("/assessment");
+
+      } catch (err: any) {
+         console.error('Error in topic/quiz generation chain:', err);
+         setError(`Processing Error: ${err.message}`);
+      } finally {
+         setIsProcessing(false);
+      }
+    }
   }
 
   // Helper function to convert letter answer to the actual text answer
@@ -157,20 +209,12 @@ export default function UploadPage() {
     }
   }
 
-  // Function to simulate upload progress
-  const simulateUploadProgress = () => {
-    let progress = 0
-    const interval = setInterval(() => {
-      progress += 5
-      setUploadProgress(progress)
-
-      if (progress >= 100) {
-        clearInterval(interval)
-        setTimeout(() => {
-          router.push("/assessment")
-        }, 500)
-      }
-    }, 200)
+  if (authLoading) {
+     return (
+       <div className="flex items-center justify-center min-h-screen">
+         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+       </div>
+     ); 
   }
 
   return (
@@ -180,6 +224,19 @@ export default function UploadPage() {
       </Link>
 
       <h1 className="text-2xl font-bold text-blue-700 mb-6">Upload Your Study Materials</h1>
+
+      {!user && (
+         <div className="mb-4 p-4 border border-yellow-300 bg-yellow-50 text-yellow-700 rounded-md">
+            <p>Please <Link href="/login" className="font-bold underline">log in</Link> or <Link href="/signup" className="font-bold underline">sign up</Link> to upload materials.</p>
+         </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-4 border border-red-300 bg-red-50 text-red-700 rounded-md flex items-center">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          <p>{error}</p>
+        </div>
+      )}
 
       <div className="flex flex-col space-y-6">
         <div className="flex flex-col md:flex-row gap-6">
@@ -331,19 +388,19 @@ export default function UploadPage() {
 
         {/* Upload Button */}
         <div className="mt-6">
-          {uploading ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Uploading and analyzing materials...</span>
-                <span className="text-sm text-gray-500">{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} className="h-2 bg-blue-100" />
-            </div>
+          {isProcessing ? (
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700 py-6 text-lg opacity-75 cursor-not-allowed"
+              disabled
+            >
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Processing...
+            </Button>
           ) : (
             <Button
               onClick={handleSubmit}
               className="w-full bg-blue-600 hover:bg-blue-700 py-6 text-lg"
-              disabled={courseFiles.length === 0 && examFiles.length === 0}
+              disabled={!user || (courseFiles.length === 0 && examFiles.length === 0) || authLoading}
             >
               Upload and Get A Quick Assessment
             </Button>

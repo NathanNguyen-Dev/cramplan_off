@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 # Import the API router
 from .api.endpoints import generation
+from .api.endpoints import upload # Import the new upload router
 
 # Set up logging
 logging.basicConfig(
@@ -39,6 +40,8 @@ app.add_middleware(
 
 # Include the generation API router without the prefix
 app.include_router(generation.router, tags=["Generation"])
+# Include the upload API router 
+app.include_router(upload.router, tags=["Upload"]) # No prefix here either to match frontend
 
 # Simple root endpoint
 @app.get("/")

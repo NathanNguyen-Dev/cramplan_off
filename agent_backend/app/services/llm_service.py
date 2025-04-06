@@ -8,7 +8,7 @@ from openai.types.responses import (
     ResponseCreatedEvent,  # start of new event like tool call or final answer
     ResponseTextDeltaEvent
 )
-from agents import Agent, Runner, function_tool, trace 
+from agents import Agent, Runner, function_tool, trace, FileSearchTool 
 
 # Import settings from the new config location
 from ..core.config import settings
@@ -30,10 +30,20 @@ class ListOfTopics(BaseModel):
 main_topic_outline_agent = Agent(
     name="main_topic_outline_agent",
     instructions="""
-    Generate five main topics based on the user's input. 
-    For each topic, provide a description and a list of 3 subtopics.
+    Based on the user's input subject, use the file search tool to analyze the content of the provided files in the vector store.
+    Generate five main topics relevant to the subject found within the files.
+    For each topic, provide a brief description and a list of 3 relevant subtopics also derived from the file content.
+    Focus on the core concepts presented in the documents.
     """,
-    output_type=ListOfTopics
+    output_type=ListOfTopics,
+    # Add the FileSearchTool directly to the agent's tools
+    tools=[
+        FileSearchTool(
+            # Use the vector store ID from settings
+            vector_store_ids=[settings.OPENAI_VECTOR_STORE_ID], 
+            max_num_results=5 # Optional: adjust number of results if needed
+        )
+    ]
 )
 
 curated_topic_outline_agent = Agent(
@@ -81,8 +91,18 @@ class ContentTopic(BaseModel):
 
 content_writer_agent = Agent(
     name="content_writer_agent",
-    instructions="""You will be given a list of topics, for each topic, you will write a general main description for the topic. For each of the topics, you will be given a list of subtopics, you will write the subtopic title and the content for the subtopic. Focus on writing the content of the subtopics to be 1000+ words. In the content of the subtopics, try to add understanding of the key concepts, practical examples, real life applications (if applicable), summary of the subtopic and its connection to other subtopics.""",
-    output_type=ContentTopic
+    instructions="""You are given a list of topics and their subtopics. For each topic, write a general main description. For each subtopic, write detailed content (aiming for 1000+ words per subtopic). 
+    ***Crucially, use the file search tool to base all generated content (main descriptions and subtopic text) on the information available in the provided files within the vector store.*** 
+    Ensure the subtopic content includes key concepts, practical examples, real-life applications (if applicable), summaries, and connections to other subtopics, all derived from the file search results.
+    """,
+    output_type=ContentTopic,
+    # Add the FileSearchTool
+    tools=[
+        FileSearchTool(
+            vector_store_ids=[settings.OPENAI_VECTOR_STORE_ID],
+            max_num_results=5 # Adjust as needed for content generation
+        )
+    ]
 )
 
 def evaluate_quiz_understanding(quiz_results, user_answers):
