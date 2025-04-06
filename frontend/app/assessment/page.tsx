@@ -194,13 +194,8 @@ export default function AssessmentPage() {
     .then(data => {
       console.log('Topics curated successfully:', data);
       
-      // Prepare payload for generate-content
-      const generateContentPayload = {
-        topics: data, // Assuming the curate-topics response has the expected format
-        understanding: {
-          scores: normalizedScores
-        }
-      };
+      // Prepare payload for generate-content - Send ONLY the curated topics data
+      const generateContentPayload = data; // <-- Use the data directly
       
       console.log('Making POST request to: http://0.0.0.0:8000/generate-content');
       console.log('Request body:', JSON.stringify(generateContentPayload, null, 2));
@@ -211,7 +206,7 @@ export default function AssessmentPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(generateContentPayload),
+        body: JSON.stringify(generateContentPayload), // <-- Send the correct payload
       });
     })
     .then(response => {

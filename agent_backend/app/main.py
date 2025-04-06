@@ -37,8 +37,8 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Include the generation API router
-app.include_router(generation.router, prefix="/api/v1", tags=["Generation"])
+# Include the generation API router without the prefix
+app.include_router(generation.router, tags=["Generation"])
 
 # Simple root endpoint
 @app.get("/")
