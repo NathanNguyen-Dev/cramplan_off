@@ -1,6 +1,0 @@
-[submodule "cramplan_frontend"]
-	path = cramplan_frontend
-	url = https://github.com/Spagum9113/cramplan_frontend.git
-[submodule "cramplan_voice"]
-	path = cramplan_voice
-	url = https://github.com/Spagum9113/cramplan_voice.git
