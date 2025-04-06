@@ -8,7 +8,7 @@ from openai.types.responses import (
     ResponseCreatedEvent,  # start of new event like tool call or final answer
     ResponseTextDeltaEvent
 )
-from agents import Agent, Runner, function_tool, trace, FileSearchTool 
+from agents import Agent, Runner, function_tool, trace, FileSearchTool, WebSearchTool
 
 # Import settings from the new config location
 from ..core.config import settings
@@ -93,7 +93,8 @@ content_writer_agent = Agent(
     name="content_writer_agent",
     instructions="""You are given a list of topics and their subtopics. For each topic, write a general main description. For each subtopic, write detailed content (aiming for 1000+ words per subtopic). 
     ***Crucially, use the file search tool to base all generated content (main descriptions and subtopic text) on the information available in the provided files within the vector store.*** 
-    Ensure the subtopic content includes key concepts, practical examples, real-life applications (if applicable), summaries, and connections to other subtopics, all derived from the file search results.
+    Use the web search tool for each subtopic to find more information and add it to the subtopic content.
+    Ensure the subtopic content includes key concepts, practical examples, real-life applications (if applicable), summaries, and connections to other subtopics.
     """,
     output_type=ContentTopic,
     # Add the FileSearchTool
@@ -101,7 +102,8 @@ content_writer_agent = Agent(
         FileSearchTool(
             vector_store_ids=[settings.OPENAI_VECTOR_STORE_ID],
             max_num_results=5 # Adjust as needed for content generation
-        )
+        ),
+        WebSearchTool()
     ]
 )
 

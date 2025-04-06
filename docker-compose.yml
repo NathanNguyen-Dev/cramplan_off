@@ -1,11 +1,35 @@
-version: '3.8'
-
 services:
-  agent-backend:
+  frontend:
     build:
-      context: ./agent_backend  # Specifies the directory containing the Dockerfile
-      dockerfile: Dockerfile    # Specifies the name of the Dockerfile
-    container_name: cramplan-agent # Optional: Assigns a specific name to the container
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://backend:8000}
+    container_name: ${COMPOSE_PROJECT_NAME:-cramplan}-frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    networks:
+      - cramplan-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./agent_backend
+      dockerfile: Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME:-cramplan}-agent
     env_file:
       - ./agent_backend/.env    # Loads environment variables from the .env file inside agent_backend
     ports:
@@ -15,5 +39,12 @@ services:
       # Remove or comment out for production builds where code is copied into the image.
       - ./agent_backend/app:/code/app
     # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload # Optional: Override CMD for development features like reload
+    networks:
+      - cramplan-net
+    restart: unless-stopped
+
+networks:
+  cramplan-net:
+    driver: bridge
 
 # Note: Ensure the .env file exists in ./agent_backend/ before running docker-compose up. 
