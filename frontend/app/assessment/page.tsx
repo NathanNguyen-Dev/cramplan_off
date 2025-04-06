@@ -161,8 +161,27 @@ export default function AssessmentPage() {
     
     console.log('Topic understanding scores:', normalizedScores);
     
+    // --- BEGIN Retrieve and Clear Vector Store File IDs ---
+    let vectorStoreFileIds: string[] = [];
+    try {
+      const storedIds = localStorage.getItem('vectorStoreFileIds');
+      if (storedIds) {
+        vectorStoreFileIds = JSON.parse(storedIds);
+        console.log('Retrieved vectorStoreFileIds from localStorage:', vectorStoreFileIds);
+        localStorage.removeItem('vectorStoreFileIds'); // Clear after retrieving
+        console.log('Cleared vectorStoreFileIds from localStorage.');
+      } else {
+        console.log('No vectorStoreFileIds found in localStorage.');
+      }
+    } catch (error) {
+      console.error('Error retrieving or parsing vectorStoreFileIds from localStorage:', error);
+      // Proceed without IDs, but log the error
+    }
+    // --- END Retrieve and Clear Vector Store File IDs ---
+    
     // Get the subject from localStorage or use a default
     const storedSubject = localStorage.getItem('studySubject') || "Biology";
+    const storedTitle = storedSubject ? `Study Plan for ${storedSubject}` : "Study Plan";
     
     // Prepare request payload for curate-topics
     const curateTopicsPayload = {
@@ -194,8 +213,12 @@ export default function AssessmentPage() {
     .then(data => {
       console.log('Topics curated successfully:', data);
       
-      // Prepare payload for generate-content - Send ONLY the curated topics data
-      const generateContentPayload = data; // <-- Use the data directly
+      // Prepare payload for generate-content including file IDs
+      const generateContentPayload = {
+        curated_topics: data, // The response from curate-topics
+        title: storedTitle,
+        vector_store_file_ids: vectorStoreFileIds // Include the retrieved IDs
+      };
       
       console.log('Making POST request to: http://0.0.0.0:8000/generate-content');
       console.log('Request body:', JSON.stringify(generateContentPayload, null, 2));

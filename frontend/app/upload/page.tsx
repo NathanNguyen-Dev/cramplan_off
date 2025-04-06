@@ -113,6 +113,25 @@ export default function UploadPage() {
       console.log('Files uploaded successfully:', uploadResult);
       uploadSuccessful = true;
 
+      // --- BEGIN Extract and Store Vector Store File IDs ---
+      if (uploadResult && uploadResult.upload_details && Array.isArray(uploadResult.upload_details)) {
+        const completedFileIds = uploadResult.upload_details
+          .filter((detail: any) => detail.status === 'completed' && detail.vector_store_file_id)
+          .map((detail: any) => detail.vector_store_file_id);
+          
+        if (completedFileIds.length > 0) {
+          localStorage.setItem('vectorStoreFileIds', JSON.stringify(completedFileIds));
+          console.log('Stored vectorStoreFileIds in localStorage:', completedFileIds);
+        } else {
+           console.warn('No successfully completed vector store file IDs found in upload response.');
+           localStorage.removeItem('vectorStoreFileIds'); // Clear potentially old data
+        }
+      } else {
+         console.warn('Upload response did not contain expected upload_details. Cannot store file IDs.');
+         localStorage.removeItem('vectorStoreFileIds'); // Clear potentially old data
+      }
+      // --- END Extract and Store Vector Store File IDs ---
+
     } catch (err: any) {
       console.error('Error uploading files:', err);
       setError(`Upload Error: ${err.message}`);

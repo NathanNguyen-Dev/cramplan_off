@@ -11,79 +11,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 
-// Sample topic data (in a real app, this would be fetched based on the topicId)
-const topicData = {
-  id: "topic-1-1",
-  title: "Introduction to Cell Biology",
-  content: `
-    # Introduction to Cell Biology
-    
-    Cells are the basic structural and functional units of all living organisms. They are often called the "building blocks of life." The study of cells is called cell biology.
-    
-    ## Cell Structure Overview
-    
-    All cells have certain common components:
-    
-    1. **Cell Membrane**: A selectively permeable barrier that separates the cell from its environment.
-    2. **Cytoplasm**: A gel-like substance where cellular components are suspended.
-    3. **Genetic Material**: DNA (and RNA), which contains the instructions for cell function and reproduction.
-    
-    ## Types of Cells
-    
-    There are two main types of cells:
-    
-    1. **Prokaryotic Cells**: Simpler cells without a nucleus or membrane-bound organelles. Examples include bacteria.
-    2. **Eukaryotic Cells**: More complex cells with a nucleus and various membrane-bound organelles. Examples include plant and animal cells.
-    
-    ## Cell Membrane Functions
-    
-    The cell membrane performs several crucial functions:
-    
-    - Controls what enters and exits the cell
-    - Maintains cell shape
-    - Helps cells communicate with each other
-    - Provides protection and support
-    
-    ## Organelles and Their Roles
-    
-    Eukaryotic cells contain various organelles, each with specific functions:
-    
-    - **Nucleus**: Contains the cell's genetic material and controls cellular activities
-    - **Mitochondria**: Produces energy through cellular respiration
-    - **Endoplasmic Reticulum**: Involved in protein and lipid synthesis
-    - **Golgi Apparatus**: Modifies, sorts, and packages proteins for secretion
-    - **Lysosomes**: Contain digestive enzymes for breaking down waste materials
-    - **Ribosomes**: Sites of protein synthesis
-  `,
-  quiz: [
-    {
-      question: "What are the two main types of cells?",
-      options: [
-        "Plant cells and animal cells",
-        "Prokaryotic cells and eukaryotic cells",
-        "Simple cells and complex cells",
-        "Membrane cells and non-membrane cells",
-      ],
-      correctAnswer: "Prokaryotic cells and eukaryotic cells",
-    },
-    {
-      question: "Which organelle is responsible for energy production in the cell?",
-      options: ["Nucleus", "Golgi apparatus", "Mitochondria", "Endoplasmic reticulum"],
-      correctAnswer: "Mitochondria",
-    },
-    {
-      question: "What is the main function of the cell membrane?",
-      options: [
-        "To produce energy",
-        "To control what enters and exits the cell",
-        "To store genetic material",
-        "To synthesize proteins",
-      ],
-      correctAnswer: "To control what enters and exits the cell",
-    },
-  ],
-}
-
 export default function LearnPage({ params }: { params: { topicId: string } }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("learn")
@@ -125,6 +52,8 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
       setChatMessages((prev) => [...prev, { role: "assistant", content: response }])
     }, 1000)
 
+    // TODO: Implement actual API call to AI tutor here
+
     setInputMessage("")
   }
 
@@ -138,11 +67,7 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
   const handleSubmitQuiz = () => {
     // Calculate score
     let score = 0
-    topicData.quiz.forEach((question, index) => {
-      if (quizAnswers[index] === question.correctAnswer) {
-        score++
-      }
-    })
+    // TODO: Implement quiz scoring based on fetched quiz data
 
     setQuizScore(score)
     setQuizSubmitted(true)
@@ -169,8 +94,10 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>{topicData.title}</CardTitle>
-          <CardDescription>Learn about the basic structure and function of cells</CardDescription>
+          {/* TODO: Fetch and display actual topic title */}
+          <CardTitle>{/* topicData.title */} Topic Title Placeholder</CardTitle>
+          {/* TODO: Fetch and display actual topic description */}
+          <CardDescription>{/* Learn about the basic structure and function of cells */} Topic Description Placeholder</CardDescription>
         </CardHeader>
       </Card>
 
@@ -191,43 +118,8 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
           <Card>
             <CardContent className="p-6">
               <div className="prose max-w-none">
-                {topicData.content.split("\n\n").map((paragraph, index) => {
-                  if (paragraph.startsWith("# ")) {
-                    return (
-                      <h1 key={index} className="text-3xl font-bold mt-6 mb-4">
-                        {paragraph.substring(2)}
-                      </h1>
-                    )
-                  } else if (paragraph.startsWith("## ")) {
-                    return (
-                      <h2 key={index} className="text-2xl font-bold mt-6 mb-3">
-                        {paragraph.substring(3)}
-                      </h2>
-                    )
-                  } else if (paragraph.startsWith("- ")) {
-                    return (
-                      <ul key={index} className="list-disc pl-5 my-3">
-                        {paragraph.split("\n- ").map((item, i) => (
-                          <li key={i} className="my-1">
-                            {item.replace("- ", "")}
-                          </li>
-                        ))}
-                      </ul>
-                    )
-                  } else if (paragraph.includes("**")) {
-                    return (
-                      <p key={index} className="my-3">
-                        {paragraph.split("**").map((part, i) => (i % 2 === 0 ? part : <strong key={i}>{part}</strong>))}
-                      </p>
-                    )
-                  } else {
-                    return (
-                      <p key={index} className="my-3">
-                        {paragraph}
-                      </p>
-                    )
-                  }
-                })}
+                {/* TODO: Fetch and render actual topic content */}
+                <p>Topic content will be displayed here once fetched.</p>
               </div>
             </CardContent>
           </Card>
@@ -285,36 +177,19 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
             <CardContent>
               {!quizSubmitted ? (
                 <div className="space-y-6">
-                  {topicData.quiz.map((question, index) => (
-                    <div key={index} className="space-y-3">
-                      <h3 className="font-medium">
-                        {index + 1}. {question.question}
-                      </h3>
-                      <RadioGroup
-                        value={quizAnswers[index] || ""}
-                        onValueChange={(value) => handleQuizAnswer(index, value)}
-                      >
-                        {question.options.map((option, optionIndex) => (
-                          <div key={optionIndex} className="flex items-center space-x-2 rounded-md border p-3">
-                            <RadioGroupItem value={option} id={`q${index}-option-${optionIndex}`} />
-                            <Label htmlFor={`q${index}-option-${optionIndex}`} className="flex-1">
-                              {option}
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
-                  ))}
+                  {/* TODO: Fetch and render actual quiz questions */}
+                  <p>Quiz questions will be displayed here once fetched.</p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg">
                     <div className="text-5xl font-bold mb-2">
-                      {quizScore}/{topicData.quiz.length}
+                      {quizScore}/{/* topicData.quiz.length */} ?
                     </div>
                     <p className="text-gray-500">Correct Answers</p>
 
-                    {quizScore === topicData.quiz.length ? (
+                    {/* TODO: Logic depends on fetched quiz length */}
+                    {/* {quizScore === topicData.quiz.length ? (
                       <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-md">
                         Great job! You've mastered this topic.
                       </div>
@@ -326,38 +201,14 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
                       <div className="mt-4 p-3 bg-red-100 text-red-800 rounded-md">
                         You might need to review this topic again before moving on.
                       </div>
-                    )}
+                    )} */}
+                     <p>Quiz result feedback will appear here.</p>
                   </div>
 
                   <div className="space-y-4">
                     <h3 className="font-medium">Review Your Answers:</h3>
-                    {topicData.quiz.map((question, index) => {
-                      const isCorrect = quizAnswers[index] === question.correctAnswer
-
-                      return (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border ${
-                            isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-                          }`}
-                        >
-                          <h4 className="font-medium">
-                            {index + 1}. {question.question}
-                          </h4>
-                          <p className="mt-2">
-                            Your answer:{" "}
-                            <span className={isCorrect ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                              {quizAnswers[index] || "No answer provided"}
-                            </span>
-                          </p>
-                          {!isCorrect && (
-                            <p className="mt-1 text-green-600">
-                              Correct answer: <span className="font-medium">{question.correctAnswer}</span>
-                            </p>
-                          )}
-                        </div>
-                      )
-                    })}
+                    {/* TODO: Fetch and render actual quiz review */}
+                    <p>Quiz answer review will appear here.</p>
                   </div>
                 </div>
               )}
@@ -366,7 +217,9 @@ export default function LearnPage({ params }: { params: { topicId: string } }) {
               {!quizSubmitted ? (
                 <Button
                   onClick={handleSubmitQuiz}
-                  disabled={Object.keys(quizAnswers).length < topicData.quiz.length}
+                  // TODO: Disable based on fetched quiz data
+                  // disabled={Object.keys(quizAnswers).length < topicData.quiz.length}
+                  disabled={true} // Disable until data is fetched
                   className="w-full"
                 >
                   Submit Answers
