@@ -1,6 +1,6 @@
 import os
-#from agents import Agent, Runner,function_tool,trace
-#from dotenv import load_dotenv
+from agents import Agent, Runner,function_tool,trace
+from dotenv import load_dotenv
 import asyncio
 from pydantic import BaseModel
 from openai.types.responses import (
@@ -8,17 +8,9 @@ from openai.types.responses import (
     ResponseCreatedEvent,  # start of new event like tool call or final answer
     ResponseTextDeltaEvent
 )
-from agents import Agent, Runner, function_tool, trace 
 
-# Import settings from the new config location
-from ..core.config import settings
-
-# Ensure the API key is set for the agents library
-# This depends on how the 'agents' library expects the key (e.g., environment variable, direct configuration)
-# Assuming it checks the environment variable:
-os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-
-
+# Remove duplicate load_dotenv and environment variable setting
+# since it's now handled by env_setup
 class Topic(BaseModel):
     topic: str
     description: str
@@ -125,11 +117,6 @@ def evaluate_quiz_understanding(quiz_results, user_answers):
     return topic_understanding
 
 async def main():
-    # Ensure API key is available before running
-    if not settings.OPENAI_API_KEY:
-        print("Error: OPENAI_API_KEY not found in environment variables or .env file.")
-        return
-
     input_prompt = input("What is the main subject of the content? ")
 
     with trace("Deterministic story flow"):
