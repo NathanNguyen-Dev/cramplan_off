@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Upload } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 export default function Home() {
+  const { user } = useAuth();
+  const getStartedLink = user ? "/upload" : "/signup";
+
   return (
     <div className="flex min-h-screen flex-col">
       <main className="flex-1">
@@ -22,7 +28,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button size="lg" asChild>
-                    <Link href="/upload">
+                    <Link href={getStartedLink}>
                       Get Started <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
