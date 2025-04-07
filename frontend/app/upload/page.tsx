@@ -98,7 +98,7 @@ export default function UploadPage() {
     let uploadSuccessful = false;
     try {
       console.log('Uploading files for user:', user.uid);
-      const uploadResponse = await fetch('http://0.0.0.0:8000/upload-files', {
+      const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/upload-files`, {
         method: 'POST',
         body: formData,
       });
@@ -151,12 +151,12 @@ export default function UploadPage() {
       localStorage.setItem('studySubject', subject);
       localStorage.setItem('daysUntilExam', daysUntilExam.toString());
       
-      console.log('Making POST request to: http://0.0.0.0:8000/generate-topics');
+      console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-topics`);
       console.log('Request body:', JSON.stringify(generateTopicsRequestBody, null, 2));
 
       try {
           // Make POST request to generate topics
-          const topicsResponse = await fetch('http://0.0.0.0:8000/generate-topics', {
+          const topicsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-topics`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -172,10 +172,10 @@ export default function UploadPage() {
           console.log('Topics generated successfully:', topicsData);
 
           // Call the generate-quiz endpoint
-          console.log('Making POST request to: http://0.0.0.0:8000/generate-quiz');
+          console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-quiz`);
           console.log('Request body:', JSON.stringify(topicsData, null, 2));
           
-          const quizResponse = await fetch('http://0.0.0.0:8000/generate-quiz', {
+          const quizResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-quiz`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

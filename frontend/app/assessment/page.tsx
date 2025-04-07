@@ -193,11 +193,11 @@ export default function AssessmentPage() {
       }
     };
     
-    console.log('Making POST request to: http://0.0.0.0:8000/curate-topics');
+    console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`);
     console.log('Request body:', JSON.stringify(curateTopicsPayload, null, 2));
     
     // Call the curate-topics endpoint
-    fetch('http://0.0.0.0:8000/curate-topics', {
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -220,11 +220,11 @@ export default function AssessmentPage() {
         vector_store_file_ids: vectorStoreFileIds // Include the retrieved IDs
       };
       
-      console.log('Making POST request to: http://0.0.0.0:8000/generate-content');
+      console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-content`);
       console.log('Request body:', JSON.stringify(generateContentPayload, null, 2));
       
       // Call the generate-content endpoint
-      return fetch('http://0.0.0.0:8000/generate-content', {
+      return fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
