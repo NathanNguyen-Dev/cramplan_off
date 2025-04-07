@@ -29,14 +29,22 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Add CORS middleware
+# --- CORS Configuration --- 
+# Define allowed origins
+origins = [
+    "http://localhost:3000",  # Local frontend development
+    "https://cramplan-off-front-end.vercel.app", # Production frontend
+    # Add any other origins if needed (e.g., preview deployment URLs)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins - adjust for production
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_origins=origins,  # List of allowed origins
+    allow_credentials=True, # Allow cookies/auth headers
+    allow_methods=["*"],    # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],    # Allow all headers
 )
+# --- End CORS Configuration ---
 
 # Include the generation API router without the prefix
 app.include_router(generation.router, tags=["Generation"])
