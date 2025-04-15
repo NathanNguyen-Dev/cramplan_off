@@ -75,6 +75,7 @@ export default function AssessmentPage() {
   const [showResults, setShowResults] = useState(false)
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(sampleQuizQuestions)
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false)
+  const [generationStatus, setGenerationStatus] = useState<string | null>(null)
   
   // Load quiz data from localStorage on component mount
   useEffect(() => {
@@ -132,128 +133,133 @@ export default function AssessmentPage() {
     return "Advanced"
   }
 
-  const handleFinish = () => {
-    // Set loading state to true
+  const handleFinish = async () => {
     setIsGeneratingPlan(true);
-    
-    // Calculate topic understanding scores based on quiz performance
+    setGenerationStatus('Calculating scores...');
+
+    // --- Keep score calculation and file ID retrieval --- 
     const topicScores = quizQuestions.reduce((acc, question) => {
       const topic = question.topic;
       if (!acc[topic]) {
         acc[topic] = { total: 0, correct: 0 };
       }
-      
       acc[topic].total += 1;
-      
-      // Check if the answer was correct
       if (answers[question.id] === question.correctAnswer) {
         acc[topic].correct += 1;
       }
-      
       return acc;
     }, {} as Record<string, { total: number, correct: number }>);
-    
-    // Convert to percentage scores (0-100)
     const normalizedScores: Record<string, number> = {};
     Object.entries(topicScores).forEach(([topic, performance]) => {
       normalizedScores[topic] = Math.round((performance.correct / performance.total) * 100);
     });
-    
     console.log('Topic understanding scores:', normalizedScores);
-    
-    // --- BEGIN Retrieve and Clear Vector Store File IDs ---
     let vectorStoreFileIds: string[] = [];
     try {
       const storedIds = localStorage.getItem('vectorStoreFileIds');
       if (storedIds) {
         vectorStoreFileIds = JSON.parse(storedIds);
-        console.log('Retrieved vectorStoreFileIds from localStorage:', vectorStoreFileIds);
-        localStorage.removeItem('vectorStoreFileIds'); // Clear after retrieving
-        console.log('Cleared vectorStoreFileIds from localStorage.');
-      } else {
-        console.log('No vectorStoreFileIds found in localStorage.');
+        // DO NOT REMOVE FROM LOCALSTORAGE YET - needed for delete call later
       }
     } catch (error) {
-      console.error('Error retrieving or parsing vectorStoreFileIds from localStorage:', error);
-      // Proceed without IDs, but log the error
+      console.error('Error retrieving vectorStoreFileIds:', error);
     }
-    // --- END Retrieve and Clear Vector Store File IDs ---
-    
-    // Get the subject from localStorage or use a default
     const storedSubject = localStorage.getItem('studySubject') || "Biology";
-    const storedTitle = storedSubject ? `Study Plan for ${storedSubject}` : "Study Plan";
-    
-    // Prepare request payload for curate-topics
-    const curateTopicsPayload = {
-      request: {
-        subject: storedSubject
-      },
-      understanding: {
-        scores: normalizedScores
-      }
-    };
-    
-    console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`);
-    console.log('Request body:', JSON.stringify(curateTopicsPayload, null, 2));
-    
-    // Call the curate-topics endpoint
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(curateTopicsPayload),
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok for curate-topics');
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Topics curated successfully:', data);
-      
-      // Prepare payload for generate-content including file IDs
-      const generateContentPayload = {
-        curated_topics: data, // The response from curate-topics
-        title: storedTitle,
-        vector_store_file_ids: vectorStoreFileIds // Include the retrieved IDs
+    // --- End score calculation and file ID retrieval ---
+
+    try {
+      // --- Step 1: Curate Topics --- 
+      setGenerationStatus('Curating topics...');
+      const curateTopicsPayload = {
+        request: { subject: storedSubject },
+        understanding: { scores: normalizedScores }
       };
-      
-      console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-content`);
-      console.log('Request body:', JSON.stringify(generateContentPayload, null, 2));
-      
-      // Call the generate-content endpoint
-      return fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-content`, {
+      console.log(`Making POST request to: ${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`);
+      const curateResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/curate-topics`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(generateContentPayload), // <-- Send the correct payload
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(curateTopicsPayload),
       });
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok for generate-content');
+      if (!curateResponse.ok) {
+        throw new Error(`Topic curation failed: ${curateResponse.statusText}`);
       }
-      return response.json();
-    })
-    .then(contentData => {
-      console.log('Content generated successfully:', contentData);
+      const curatedData = await curateResponse.json();
+      const curatedTopics = curatedData.list_of_topics;
+      console.log('Topics curated successfully:', curatedTopics);
+
+      if (!curatedTopics || curatedTopics.length === 0) {
+          throw new Error("No topics were curated. Cannot generate content.");
+      }
+
+      // --- Step 2: Generate Content Topic by Topic --- 
+      const allGeneratedContent: any[] = []; // To store results from each topic
+      for (let i = 0; i < curatedTopics.length; i++) {
+        const topicToGenerate = curatedTopics[i];
+        setGenerationStatus(`Generating content for topic ${i + 1} of ${curatedTopics.length}: ${topicToGenerate.topic}...`);
+        console.log(`Requesting content for topic: ${topicToGenerate.topic}`);
+
+        const singleTopicPayload = { topic: topicToGenerate };
+        const contentResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/generate-single-topic`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(singleTopicPayload),
+        });
+
+        if (!contentResponse.ok) {
+           const errorText = await contentResponse.text();
+           throw new Error(`Content generation failed for topic "${topicToGenerate.topic}": ${contentResponse.status} - ${errorText}`);
+        }
+        const generatedTopicContent = await contentResponse.json();
+        allGeneratedContent.push(generatedTopicContent); // Add the result (ContentMain object)
+        console.log(`Content generated for topic: ${topicToGenerate.topic}`, generatedTopicContent);
+
+        // Add a delay before the next iteration to avoid hitting rate limits
+        if (i < curatedTopics.length - 1) { // Don't wait after the last topic
+          const delaySeconds = 2; // Adjust delay as needed (in seconds)
+          setGenerationStatus(`Waiting ${delaySeconds}s before next topic...`);
+          await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+        }
+      }
+
+      // --- Step 3: Delete Vector Store Files --- 
+      if (vectorStoreFileIds.length > 0) {
+        setGenerationStatus('Cleaning up uploaded files...');
+        console.log('Deleting vector store files:', vectorStoreFileIds);
+        const deletePayload = { vector_store_file_ids: vectorStoreFileIds };
+        const deleteResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/delete-vector-files`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deletePayload),
+        });
+        if (!deleteResponse.ok) {
+          // Log error but don't necessarily block the user
+          console.error(`Failed to delete vector store files: ${deleteResponse.statusText}`);
+        } else {
+          const deleteResult = await deleteResponse.json();
+          console.log('File deletion result:', deleteResult);
+          // Clear IDs from localStorage only after successful deletion request
+          localStorage.removeItem('vectorStoreFileIds'); 
+        }
+      } else {
+         console.log('No vector store files to delete.');
+      }
+
+      // --- Step 4: Save Final Result and Navigate --- 
+      setGenerationStatus('Finalizing study plan...');
+      // Assemble the final content structure expected by the study plan page
+      const finalStudyPlanContent = { topic: allGeneratedContent }; 
+      localStorage.setItem('studyPlanContent', JSON.stringify(finalStudyPlanContent));
+      console.log('Complete study plan content saved:', finalStudyPlanContent);
       
-      // Store the generated content data for use in the study plan page
-      localStorage.setItem('studyPlanContent', JSON.stringify(contentData));
-      
-      // Navigate to the study plan page
       router.push("/study-plan");
-    })
-    .catch(error => {
-      console.error('Error in API chain:', error);
-      // Set loading state back to false in case of error
+
+    } catch (error: any) {
+      console.error('Error during study plan generation process:', error);
+      setGenerationStatus('Error'); 
       setIsGeneratingPlan(false);
-      // Show an error message to the user
-      alert('There was an error generating your study plan. Please try again.');
-    });
+      alert(`There was an error generating the study plan: ${error.message}`);
+    } 
+    // No finally block needed here for setIsGeneratingPlan, handled on success/error
   }
 
   if (showResults) {
@@ -345,7 +351,7 @@ export default function AssessmentPage() {
               {isGeneratingPlan ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating Your Study Plan...
+                  {generationStatus || 'Generating Your Study Plan...'}
                 </>
               ) : (
                 "Generate My Study Plan"

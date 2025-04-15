@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter
+from fastapi import FastAPI, HTTPException, UploadFile, File, APIRouter, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 import asyncio
 from typing import List, Dict, Optional
@@ -91,6 +91,19 @@ class ContentGenerationRequest(BaseModel):
     curated_topics: TopicResponse
     title: Optional[str] = "Study Plan"
     vector_store_file_ids: List[str] # IDs of files to delete from vector store
+
+# --- New Models for Chunking --- 
+class SingleTopicGenerationRequest(BaseModel):
+    topic: Topic # The specific topic to generate content for
+    # Add other context if needed by the agent, e.g., main_subject: str
+
+class DeleteFilesRequest(BaseModel):
+    vector_store_file_ids: List[str]
+
+class DeleteFilesResponse(BaseModel):
+    deleted_count: int
+    failed_count: int
+    message: str
 
 @router.post("/generate-topics", response_model=TopicResponse)
 async def generate_topics(request: TopicRequest):
@@ -188,78 +201,141 @@ async def curate_topics(request: TopicRequest, understanding: UnderstandingScore
         logger.error(f"Error curating topics: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error curating topics: {str(e)}")
 
-@router.post("/generate-content", response_model=ContentResponse)
-async def generate_content(request: ContentGenerationRequest): # Use the new request model
-    vector_store_id = settings.OPENAI_VECTOR_STORE_ID
-    if not vector_store_id:
-         logger.error("OPENAI_VECTOR_STORE_ID not configured. Cannot delete files.")
-         # Depending on requirements, might raise HTTPException here instead of just logging
-         # raise HTTPException(status_code=500, detail="Vector Store ID not configured for file deletion.")
+# --- REMOVE/COMMENT OUT Original /generate-content Endpoint ---
+# @router.post("/generate-content", response_model=ContentResponse)
+# async def generate_content(request: ContentGenerationRequest):
+#     vector_store_id = settings.OPENAI_VECTOR_STORE_ID
+#     if not vector_store_id:
+#         logger.error("OPENAI_VECTOR_STORE_ID not configured. Cannot delete files.")
+#         raise HTTPException(status_code=500, detail="Vector Store ID not configured.")
+#
+#     try:
+#         logger.info(f"Generating content for {len(request.curated_topics.list_of_topics)} curated topics")
+#         curated_topics_string = "\\n".join(
+#              f"{i+1}. {topic.topic}"
+#              for i, topic in enumerate(request.curated_topics.list_of_topics)
+#          )
+#
+#         content_result = await Runner.run(
+#              f"Here are the topics to write content for:\\n{curated_topics_string}\\nYou need to output the main content, its description and the subtopics with the content for each subtopic."
+#         )
+#
+#         response_content = [
+#             ContentMain(
+#                 topic_title=main_topic.topic_title,
+#                 main_description=main_topic.main_description,
+#                 subtopics=[
+#                     ContentSub(sub_topic_title=sub.sub_topic_title, sub_content_text=sub.sub_content_text)
+#                     for sub in main_topic.subtopics
+#                 ]
+#             ) for main_topic in content_result.final_output.topic
+#         ]
+#
+#         logger.info(f"Generated content with {len(response_content)} sections")
+#         final_result = ContentResponse(topic=response_content)
+#
+#         if request.vector_store_file_ids:
+#             logger.info(f"Attempting to delete {len(request.vector_store_file_ids)} files from Vector Store {vector_store_id} post-generation.")
+#             success_delete = []
+#             failed_delete = []
+#             for vs_file_id in request.vector_store_file_ids:
+#                 try:
+#                     delete_status = await client.vector_stores.files.delete(
+#                         vector_store_id=vector_store_id,
+#                         file_id=vs_file_id
+#                     )
+#                     if delete_status.deleted:
+#                         logger.info(f"Successfully deleted Vector Store File ID: {vs_file_id} from VS: {vector_store_id}")
+#                         success_delete.append(vs_file_id)
+#                     else:
+#                         logger.warning(f"Deletion status 'false' for Vector Store File ID: {vs_file_id} in VS: {vector_store_id}. Already deleted?")
+#                         failed_delete.append(vs_file_id)
+#                 except Exception as delete_error:
+#                     logger.error(f"Failed to delete Vector Store File ID: {vs_file_id} from VS: {vector_store_id}. Error: {str(delete_error)}", exc_info=True)
+#                     failed_delete.append(vs_file_id)
+#             logger.info(f"Vector Store File deletion summary: Success={len(success_delete)}, Failed={len(failed_delete)}")
+#         else:
+#             logger.info(f"Skipping vector store file deletion (no files provided).")
+#
+#         return final_result
+#     except Exception as e:
+#         logger.error(f"Error generating content: {str(e)}", exc_info=True)
+#         raise HTTPException(status_code=500, detail=f"Error generating content: {str(e)}")
 
+# --- New Endpoint for Single Topic Generation ---
+@router.post("/generate-single-topic", response_model=ContentMain)
+async def generate_single_topic(request: SingleTopicGenerationRequest):
+    """Generates content for a single topic."""
+    logger.info(f"Generating content for single topic: {request.topic.topic}")
     try:
-        logger.info(f"Generating content for {len(request.curated_topics.list_of_topics)} curated topics")
-        curated_topics_string = "\\n".join(
-             f"{i+1}. {topic.topic}"
-             for i, topic in enumerate(request.curated_topics.list_of_topics)
-         )
+        # Construct prompt specific to this single topic
+        # Example: You might need more context than just the topic title/desc/subtopics
+        # Adjust the prompt as needed for your content_writer_agent
+        topic_string = f"Topic: {request.topic.topic}\nDescription: {request.topic.description}\nSubtopics: {', '.join(request.topic.subtopics)}"
+        prompt = f"Write content for the following topic:\n{topic_string}\nYou need to output the main content, its description and the subtopics with the content for each subtopic."
 
-        content_result = await Runner.run(
-            content_writer_agent,
-             f"Here are the topics to write content for:\n{curated_topics_string}\nYou need to output the main content, its description and the subtopics with the content for each subtopic."
+        # Run the agent for the single topic
+        content_result = await Runner.run(content_writer_agent, prompt)
+
+        # Expecting the agent to return a list containing ONE ContentMain object for the single topic
+        if not content_result.final_output.topic or len(content_result.final_output.topic) != 1:
+            logger.error(f"Agent did not return exactly one ContentMain object for topic: {request.topic.topic}")
+            raise HTTPException(status_code=500, detail="Content generation for topic failed internally.")
+
+        single_topic_content = content_result.final_output.topic[0]
+
+        # Map to response model (assuming agent output matches ContentMain structure)
+        response_main = ContentMain(
+            topic_title=single_topic_content.topic_title,
+            main_description=single_topic_content.main_description,
+            subtopics=[
+                ContentSub(sub_topic_title=sub.sub_topic_title, sub_content_text=sub.sub_content_text)
+                for sub in single_topic_content.subtopics
+            ]
         )
 
-        response_content = [
-            ContentMain(
-                topic_title=main_topic.topic_title,
-                main_description=main_topic.main_description,
-                subtopics=[
-                    ContentSub(sub_topic_title=sub.sub_topic_title, sub_content_text=sub.sub_content_text)
-                    for sub in main_topic.subtopics
-                ]
-            ) for main_topic in content_result.final_output.topic
-        ]
+        logger.info(f"Successfully generated content for topic: {request.topic.topic}")
+        return response_main
 
-        logger.info(f"Generated content with {len(response_content)} sections")
-
-        # --- BEGIN FILE DELETION LOGIC ---
-        if vector_store_id and request.vector_store_file_ids:
-            logger.info(f"Attempting to delete {len(request.vector_store_file_ids)} files from Vector Store {vector_store_id} post-generation.")
-            deletion_results = {"success": [], "failed": []}
-            for vs_file_id in request.vector_store_file_ids:
-                try:
-                    # Attempt to delete the file from the specific vector store
-                    delete_status = await client.vector_stores.files.delete(
-                        vector_store_id=vector_store_id,
-                        file_id=vs_file_id
-                    )
-                    if delete_status.deleted:
-                        logger.info(f"Successfully deleted Vector Store File ID: {vs_file_id} from VS: {vector_store_id}")
-                        deletion_results["success"].append(vs_file_id)
-                    else:
-                        # This might happen if the file was already deleted or never existed in this VS
-                        logger.warning(f"Deletion status 'false' for Vector Store File ID: {vs_file_id} in VS: {vector_store_id}. It might have been already deleted.")
-                        # Treat as success in terms of the file being gone, or track separately
-                        deletion_results["failed"].append(vs_file_id) 
-                except Exception as delete_error:
-                    # Log specific error during deletion attempt
-                    logger.error(f"Failed to delete Vector Store File ID: {vs_file_id} from VS: {vector_store_id}. Error: {str(delete_error)}", exc_info=True)
-                    deletion_results["failed"].append(vs_file_id)
-            
-            logger.info(f"Vector Store File deletion summary: Success={len(deletion_results['success'])}, Failed={len(deletion_results['failed'])}")
-            # Note: We are not deleting the original OpenAI File object (client.files.delete) here, only removing its association with the vector store.
-            # If full deletion is required, the openai_file_id would also need to be passed and handled.
-
-        elif not vector_store_id:
-             logger.warning("Skipping vector store file deletion because OPENAI_VECTOR_STORE_ID is not configured.")
-        else:
-            # Log if no IDs were provided in the request
-            logger.info("No vector_store_file_ids provided in the request. Skipping vector store file deletion.")
-        # --- END FILE DELETION LOGIC ---
-
-        return ContentResponse(topic=response_content)
     except Exception as e:
-        logger.error(f"Error generating content: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error generating content: {str(e)}")
+        logger.error(f"Error generating content for topic {request.topic.topic}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating content for topic: {str(e)}")
+
+# --- New Endpoint for File Deletion ---
+@router.post("/delete-vector-files", response_model=DeleteFilesResponse)
+async def delete_vector_files(request: DeleteFilesRequest):
+    """Deletes specified files from the OpenAI Vector Store."""
+    vector_store_id = settings.OPENAI_VECTOR_STORE_ID
+    if not vector_store_id:
+        logger.error("OPENAI_VECTOR_STORE_ID not configured. Cannot delete files.")
+        raise HTTPException(status_code=500, detail="Vector Store ID not configured.")
+
+    if not request.vector_store_file_ids:
+        logger.info("No file IDs provided for deletion.")
+        return DeleteFilesResponse(deleted_count=0, failed_count=0, message="No file IDs provided.")
+
+    logger.info(f"Attempting to delete {len(request.vector_store_file_ids)} files from Vector Store {vector_store_id}.")
+    success_delete = []
+    failed_delete = []
+    for vs_file_id in request.vector_store_file_ids:
+        try:
+            delete_status = await client.vector_stores.files.delete(
+                vector_store_id=vector_store_id,
+                file_id=vs_file_id
+            )
+            if delete_status.deleted:
+                logger.info(f"Successfully deleted Vector Store File ID: {vs_file_id} from VS: {vector_store_id}")
+                success_delete.append(vs_file_id)
+            else:
+                logger.warning(f"Deletion status 'false' for Vector Store File ID: {vs_file_id} in VS: {vector_store_id}. Already deleted?")
+                failed_delete.append(vs_file_id) # Count as failed for reporting?
+        except Exception as delete_error:
+            logger.error(f"Failed to delete Vector Store File ID: {vs_file_id} from VS: {vector_store_id}. Error: {str(delete_error)}", exc_info=True)
+            failed_delete.append(vs_file_id)
+    
+    message = f"Deletion process completed. Success: {len(success_delete)}, Failed: {len(failed_delete)}."
+    logger.info(message)
+    return DeleteFilesResponse(deleted_count=len(success_delete), failed_count=len(failed_delete), message=message)
 
 @router.get("/health")
 async def health_check():

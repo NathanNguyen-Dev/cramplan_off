@@ -95,16 +95,16 @@ content_writer_agent = Agent(
     ***Crucially, use the file search tool to base all generated content (main descriptions and subtopic text) on the information available in the provided files within the vector store.*** 
     Use the web search tool for each subtopic to find more information and add it to the subtopic content.
     Ensure the subtopic content includes key concepts, practical examples, real-life applications (if applicable), summaries, and connections to other subtopics.
-    """,
-    output_type=ContentTopic,
+    """,model="gpt-4.1-nano-2025-04-14",
+    output_type=ContentTopic
     # Add the FileSearchTool
-    tools=[
-        FileSearchTool(
-            vector_store_ids=[settings.OPENAI_VECTOR_STORE_ID],
-            max_num_results=5 # Adjust as needed for content generation
-        ),
-        WebSearchTool()
-    ]
+    # tools=[
+    #     FileSearchTool(
+    #         vector_store_ids=[settings.OPENAI_VECTOR_STORE_ID],
+    #         max_num_results=5 # Adjust as needed for content generation
+    #     ),
+    #     WebSearchTool()
+    # ]
 )
 
 def evaluate_quiz_understanding(quiz_results, user_answers):
